@@ -1,0 +1,218 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  // Removed fullTextSearch as it's not supported by PostgreSQL connector
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Users {
+  user_id         String   @id @default(uuid())
+  username        String   @unique
+  password_hash   String
+  email           String?  @unique
+  full_name       String?
+  ldap_identifier String?  @unique
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  // Relations
+  created_letters     Letters[]           @relation("LetterCreator")
+  scanned_docs        Scanned_Documents[] @relation("UserScannedDocuments")
+  archived_letters    Archives[]
+  sender_workflows    Letter_Workflow[]   @relation("WorkflowSender")
+  recipient_workflows Letter_Workflow[]   @relation("WorkflowRecipient")
+  user_roles          User_Roles[]
+  recipient_letters   Letter_Recipients[] @relation("UserRecipientLetters")
+
+  @@index([email, username])
+}
+
+model Roles {
+  role_id     String   @id @default(uuid())
+  role_name   String   @unique
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  permissions Role_Permissions[]
+  user_roles  User_Roles[]
+}
+
+model Permissions {
+  permission_id   String   @id @default(uuid())
+  permission_name String   @unique
+  description     String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  // Relations
+  role_permissions Role_Permissions[]
+}
+
+model Role_Permissions {
+  role_id       String
+  permission_id String
+  created_at    DateTime @default(now())
+
+  // Relations
+  role       Roles       @relation(fields: [role_id], references: [role_id])
+  permission Permissions @relation(fields: [permission_id], references: [permission_id])
+
+  @@id([role_id, permission_id])
+}
+
+model User_Roles {
+  user_id    String
+  role_id    String
+  created_at DateTime @default(now())
+
+  // Relations
+  user Users @relation(fields: [user_id], references: [user_id])
+  role Roles @relation(fields: [role_id], references: [role_id])
+
+  @@id([user_id, role_id])
+}
+
+model Offices {
+  office_id        String   @id @default(uuid())
+  office_name      String
+  parent_office_id String?
+  description      String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Relations
+  parent            Offices?            @relation("OfficeHierarchy", fields: [parent_office_id], references: [office_id])
+  children          Offices[]           @relation("OfficeHierarchy")
+  letter_recipients Letter_Recipients[] @relation("OfficeRecipientLetters")
+  workflow_offices  Letter_Workflow[]   @relation("OfficeWorkflows")
+
+  @@index([parent_office_id])
+}
+
+model Letter_Types {
+  letter_type_id String   @id @default(uuid())
+  type_name      String   @unique
+  description    String?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relations
+  letters   Letters[]
+  templates Templates[]
+}
+
+model Templates {
+  template_id    String   @id @default(uuid())
+  letter_type_id String
+  template_name  String
+  html_content   String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relations
+  letter_type Letter_Types @relation(fields: [letter_type_id], references: [letter_type_id])
+  letters     Letters[]
+
+  @@index([letter_type_id])
+}
+
+model Letters {
+  letter_id      String   @id @default(uuid())
+  letter_type_id String
+  template_id    String?
+  creator_id     String
+  subject        String
+  content        String
+  status         String   @default("draft") // draft|in_progress|completed|cancelled
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relations
+  letter_type  Letter_Types        @relation(fields: [letter_type_id], references: [letter_type_id])
+  template     Templates?          @relation(fields: [template_id], references: [template_id])
+  creator      Users               @relation("LetterCreator", fields: [creator_id], references: [user_id])
+  recipients   Letter_Recipients[]
+  workflows    Letter_Workflow[]
+  scanned_docs Scanned_Documents[]
+  archive      Archives?
+
+  @@index([creator_id, status, created_at])
+}
+
+model Letter_Recipients {
+  letter_recipient_id  String   @id @default(uuid())
+  letter_id            String
+  recipient_type       String // "user" or "office"
+  user_id              String?
+  office_id            String?
+  is_primary_recipient Boolean  @default(false)
+  is_cc                Boolean  @default(false)
+  created_at           DateTime @default(now())
+
+  // Relations
+  letter Letters  @relation(fields: [letter_id], references: [letter_id])
+  user   Users?   @relation("UserRecipientLetters", fields: [user_id], references: [user_id])
+  office Offices? @relation("OfficeRecipientLetters", fields: [office_id], references: [office_id])
+
+  @@index([letter_id, user_id, office_id])
+}
+
+model Letter_Workflow {
+  workflow_id    String   @id @default(uuid())
+  letter_id      String
+  from_user_id   String
+  to_user_id     String?
+  to_office_id   String?
+  action         String // created|sent|approved|rejected|etc.
+  comments       String?
+  is_signed      Boolean  @default(false)
+  signature_data Bytes?
+  created_at     DateTime @default(now())
+
+  // Relations
+  letter    Letters  @relation(fields: [letter_id], references: [letter_id])
+  from_user Users    @relation("WorkflowSender", fields: [from_user_id], references: [user_id])
+  to_user   Users?   @relation("WorkflowRecipient", fields: [to_user_id], references: [user_id])
+  to_office Offices? @relation("OfficeWorkflows", fields: [to_office_id], references: [office_id])
+
+  @@index([letter_id, from_user_id, to_user_id, to_office_id, created_at])
+}
+
+model Scanned_Documents {
+  scan_id    String   @id @default(uuid())
+  letter_id  String?
+  scan_date  DateTime @default(now())
+  scanned_by String
+  file_path  String
+  file_size  Int
+  mime_type  String
+  created_at DateTime @default(now())
+
+  // Relations
+  letter  Letters? @relation(fields: [letter_id], references: [letter_id])
+  scanner Users    @relation("UserScannedDocuments", fields: [scanned_by], references: [user_id])
+
+  @@index([letter_id, scanned_by])
+}
+
+model Archives {
+  archive_id           String   @id @default(uuid())
+  letter_id            String   @unique
+  archived_by          String
+  archive_date         DateTime @default(now())
+  retention_period     Int // in days
+  classification_level String // confidential|restricted|public
+  created_at           DateTime @default(now())
+
+  // Relations
+  letter   Letters @relation(fields: [letter_id], references: [letter_id])
+  archiver Users   @relation(fields: [archived_by], references: [user_id])
+}
