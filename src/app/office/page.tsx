@@ -1,5 +1,5 @@
 // app/offices/page.tsx
-import OfficeForm from '@/app/office/OfficeForm'
+import OfficeForm from '@/app/office/create/OfficeForm'
 import OfficeList from '@/app/office/OfficeList'
 
 export default function OfficesPage() {

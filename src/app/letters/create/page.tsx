@@ -1,120 +1,91 @@
-'use client'
+'use client'// components/WriteLetter.tsx
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from "react";
 
-export default function CreateLetterPage() {
-  const router = useRouter()
+export default function WriteLetter() {
+  const [letterTypes, setLetterTypes] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [selectedType, setSelectedType] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [templateContent, setTemplateContent] = useState("");
+  const [formData, setFormData] = useState({});
 
-  const [formData, setFormData] = useState({
-    letter_type_id: '',
-    template_id: '',
-    creator_id: '',
-    subject: '',
-    content: '',
-  })
+  useEffect(() => {
+    fetch("/api/letterTypes")
+      .then((res) => res.json())
+      .then(setLetterTypes);
+  }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+  useEffect(() => {
+    if (selectedType)
+      fetch(`/api/templates/${selectedType}`)
+        .then((res) => res.json())
+        .then(setTemplates);
+  }, [selectedType]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const res = await fetch('/api/letters', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
-      if (res.ok) {
-        router.push('/letters/inbox')
-      } else {
-        console.error('Create failed')
-      }
-    } catch (err) {
-      console.error(err)
+  useEffect(() => {
+    const template = templates.find((t) => t.template_id === selectedTemplate);
+    if (template) {
+      setTemplateContent(template.html_content);
     }
-  }
+  }, [selectedTemplate]);
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const filledTemplate = templateContent.replace(
+    /{{(.*?)}}/g,
+    (_, key) => formData[key.trim()] || `<em>[${key.trim()}]</em>`
+  );
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded shadow">
-      <h2 className="text-2xl font-semibold mb-4">📄 Create New Letter</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block font-medium mb-1">Letter Type</label>
-          <select
-            name="letter_type_id"
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          >
-            <option value="">Select Type</option>
-            <option value="type1">Type 1</option>
-            <option value="type2">Type 2</option>
-            {/* TODO: Load dynamically */}
-          </select>
-        </div>
-
-        <div>
-          <label className="block font-medium mb-1">Template</label>
-          <select
-            name="template_id"
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">None</option>
-            <option value="template1">Template 1</option>
-            <option value="template2">Template 2</option>
-            {/* TODO: Load dynamically */}
-          </select>
-        </div>
-
-        <div>
-          <label className="block font-medium mb-1">Creator</label>
-          <select
-            name="creator_id"
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          >
-            <option value="">Select Creator</option>
-            <option value="user1">User 1</option>
-            <option value="user2">User 2</option>
-            {/* TODO: Load dynamically */}
-          </select>
-        </div>
-
-        <div>
-          <label className="block font-medium mb-1">Subject</label>
-          <input
-            type="text"
-            name="subject"
-            value={formData.subject}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block font-medium mb-1">Content</label>
-          <textarea
-            name="content"
-            rows={6}
-            value={formData.content}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
+    <div className="grid grid-cols-2 gap-4 p-4">
+      <div>
+        <h3>Write Letter</h3>
+        <select
+          className="border p-2 w-full"
+          onChange={(e) => setSelectedType(e.target.value)}
         >
-          Save Letter
-        </button>
-      </form>
+          <option>Select Letter Type</option>
+          {letterTypes.map((type) => (
+            <option key={type.letter_type_id} value={type.letter_type_id}>
+              {type.type_name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="border p-2 w-full mt-2"
+          onChange={(e) => setSelectedTemplate(e.target.value)}
+        >
+          <option>Select Template</option>
+          {templates.map((t) => (
+            <option key={t.template_id} value={t.template_id}>
+              {t.template_name}
+            </option>
+          ))}
+        </select>
+
+        {/* Dynamic fields based on placeholders */}
+        {Array.from(templateContent.matchAll(/{{(.*?)}}/g)).map(([match, key]) => (
+          <input
+            key={key}
+            placeholder={key.trim()}
+            className="border p-2 mt-2 w-full"
+            value={formData[key.trim()] || ""}
+            onChange={(e) => handleInputChange(key.trim(), e.target.value)}
+          />
+        ))}
+      </div>
+
+      <div>
+        <h3>Live Letter Preview</h3>
+        <div
+          className="border p-4 bg-white min-h-[200px]"
+          dangerouslySetInnerHTML={{ __html: filledTemplate }}
+        />
+      </div>
     </div>
-  )
+  );
 }

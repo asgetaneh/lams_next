@@ -1,20 +1,31 @@
-// File: app/api/templates/route.ts
-import  prisma  from '@/lib/prisma'
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import prisma from '../../../lib/prisma'; // Adjust path as needed
 
+// Handle POST request
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const newTemplate = await prisma.templates.create({
+    const { letter_type_id, template_name, html_content } = await request.json();
+
+    const newTemplate = await prisma.template.create({
       data: {
-        template_name: body.template_name,
-        letter_type_id: body.letter_type_id,
-        html_content: body.html_content,
+        letter_type_id,
+        template_name,
+        html_content,
       },
-    })
-    return NextResponse.json(newTemplate, { status: 201 })
+    });
+
+    return NextResponse.json(newTemplate, { status: 201 });
   } catch (error) {
-    console.error('Error creating template:', error)
-    return NextResponse.json({ error: 'Failed to create template' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create template' }, { status: 500 });
+  }
+}
+
+// Optionally, handle GET requests if needed
+export async function GET() {
+  try {
+    const templates = await prisma.template.findMany();
+    return NextResponse.json(templates);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 });
   }
 }

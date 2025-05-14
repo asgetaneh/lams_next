@@ -1,0 +1,23 @@
+.btn {
+    background-color: #e5e7eb;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  .btn:hover {
+    background-color: #d1d5db;
+  }
+  
+
+  /* styles.css */
+.ProseMirror {
+    min-height: 300px;
+    padding: 1rem;
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+    .ProseMirror:focus {
+        outline: none;
+    }  
