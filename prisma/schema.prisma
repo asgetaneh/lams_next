@@ -106,22 +106,18 @@ model Letter_Types {
 
   // Relations
   letters   Letters[]
-  templates Templates[]
 }
 
 model Templates {
   template_id    String   @id @default(uuid())
-  letter_type_id String
   template_name  String
   html_content   String
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 
   // Relations
-  letter_type Letter_Types @relation(fields: [letter_type_id], references: [letter_type_id])
-  letters     Letters[]
+   letters     Letters[]
 
-  @@index([letter_type_id])
 }
 
 model Letters {
@@ -131,6 +127,7 @@ model Letters {
   creator_id     String
   subject        String
   content        String
+  html_content        String
   status         String   @default("draft") // draft|in_progress|completed|cancelled
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt

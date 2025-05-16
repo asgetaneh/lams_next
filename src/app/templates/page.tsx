@@ -8,9 +8,9 @@ const prisma = new PrismaClient();
 export default async function TemplatesPage() {
   const templates: (Templates & { letter_type: Letter_Types })[] =
     await prisma.templates.findMany({
-      include: {
-        letter_type: true,
-      },
+      // include: {
+      //   letter_type: true,
+      // },
       orderBy: {
         updated_at: 'desc',
       },
@@ -41,8 +41,11 @@ export default async function TemplatesPage() {
               <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                 Name
               </th>
-              <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+              {/* <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                 Letter Type
+              </th> */}
+               <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                Html Content
               </th>
               <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                 Last Updated
@@ -58,23 +61,36 @@ export default async function TemplatesPage() {
                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                   {template.template_name}
                 </td>
+                 
                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  {template.letter_type.type_name}
+                  {template.html_content.substring(0, 50)}...
                 </td>
                 <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   {new Date(template.updated_at).toLocaleDateString()}
                 </td>
                 <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                   <Link
-                    href={`/templates/${template.template_id}`}
+                    href={`/templates/${template.template_id}/edit`}
                     className="text-indigo-600 hover:text-indigo-900 mr-4"
                   >
                     Edit
                   </Link>
-                  <Link
-                    href={`/letters/new?template=${template.template_id}`}
-                    className="text-indigo-600 hover:text-indigo-900"
-                  >
+                   {/* <Link
+                    href={{
+                      pathname: '/templates',
+                      query: { template: template.template_id }
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                    Edit
+                  </Link> */}
+                   <Link
+                    href={{
+                      pathname: '/letters/new',
+                      query: { template: template.template_id }
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
                     Use
                   </Link>
                 </td>

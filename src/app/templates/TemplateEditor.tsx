@@ -44,23 +44,23 @@ export default function TemplateEditor({ content, onChange }: { content: string;
       LineHeight
     ],
     content,
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
-      saveToDatabase(editor.getHTML());
-    },
+    // onUpdate: ({ editor }) => {
+    //   onChange(editor.getHTML());
+    //   saveToDatabase(editor.getHTML());
+    // },
   });
 
-  const saveToDatabase = async (html: string) => {
-    try {
-      await fetch('/api/save-template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: html }),
-      });
-    } catch (error) {
-      console.error('Save failed', error);
-    }
-  };
+  // const saveToDatabase = async (html: string) => {
+  //   try {
+  //     await fetch('/api/save-template', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ content: html }),
+  //     });
+  //   } catch (error) {
+  //     console.error('Save failed', error);
+  //   }
+  // };
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
@@ -138,9 +138,18 @@ export default function TemplateEditor({ content, onChange }: { content: string;
         <button onClick={() => applyHighlight('yellow')} className="btn"><FaHighlighter /></button>
         <select onChange={(e) => insertPlaceholder(e.target.value)} className="border px-2">
           <option value="">Insert Variable</option>
-          <option value="recipient_name">Recipient Name</option>
-          <option value="sender_name">Sender Name</option>
+          <option value="header">Header</option>
+          <option value="logo">Logo</option>
+          <option value="number">Number</option>
           <option value="date">Date</option>
+          <option value="sender_name">Sender Name</option>
+          <option value="recipient_name">Recipient Name</option>
+          <option value="title">Title</option>
+          <option value="body">Body</option>
+          <option value="stamp">stamp</option>
+          <option value="signature">Signature</option>
+          <option value="titor">Titor</option>
+          <option value="footer">Footer</option>
         </select>
         <select onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()} className="border px-2">
           <option value="">Font</option>
