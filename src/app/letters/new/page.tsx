@@ -1,27 +1,21 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const RichTextEditor = dynamic(() => import('@/app/templates/RichTextEditor'), { ssr: false })
 
 export default function NewLetterPage() {
   const searchParams = useSearchParams()
   const templateId = searchParams.get('template')
-  
-  const [formData, setFormData] = useState({
-    recipient_name: '',
-    date: new Date().toISOString().split('T')[0],
-    sender_name: '',
-    title: '',
-    content: '',
-    number: ''
-  })
 
+  const [formData, setFormData] = useState<Record<string, any>>({})
   const [template, setTemplate] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Fetch template when component mounts or templateId changes
   useEffect(() => {
     const fetchTemplate = async () => {
       try {
@@ -32,20 +26,24 @@ export default function NewLetterPage() {
         }
 
         const res = await fetch(`/api/templates/${templateId}`)
-        console.log("Template response:", res)
         if (!res.ok) throw new Error('Failed to fetch template')
-        
+
         const data = await res.json()
         setTemplate(data)
-        
-        // Initialize form with template's default values if any
-        if (data.defaultValues) {
-          setFormData(prev => ({
-            ...prev,
-            ...data.defaultValues
-          }))
-        }
-      } catch (err) {
+
+        const initialValues = data.placeholders.reduce((acc: any, key: string) => {
+          if (isImagePlaceholder(key)) {
+            acc[key] = { value: '', width: '', height: '', align: 'inline' }
+          } else {
+            acc[key] = ''  // plain string for text placeholders
+          }
+          return acc
+        }, {})
+
+
+
+        setFormData(initialValues)
+      } catch (err: any) {
         setError(err.message)
       } finally {
         setLoading(false)
@@ -55,43 +53,143 @@ export default function NewLetterPage() {
     fetchTemplate()
   }, [templateId])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+ const handleChange = (name: string, value: any, field?: string) => {
+  if (field) {
+    // For image placeholders (object)
+    setFormData((prev) => ({
+      ...prev,
+      [name]: {
+        ...prev[name],
+        [field]: value,
+      },
+    }))
+  } else {
+    // For simple string placeholders (text inputs or rich text)
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+}
+
+
+
+  const isImagePlaceholder = (key: string) => /logo|stamp|signature|ti-tor|image/i.test(key)
+
+  const renderInput = (key: string) => {
+    if (isImagePlaceholder(key)) {
+  return (
+    <div key={key} className="border p-4 rounded space-y-2 bg-gray-50">
+      <label className="block mb-1 font-medium capitalize">{key.replace(/_/g, ' ')}</label>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) {
+            const reader = new FileReader()
+            reader.onload = () => handleChange(key, reader.result, 'value')
+            reader.readAsDataURL(file)
+          }
+        }}
+      />
+
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="Width (e.g. 150px or 50%)"
+          className="border p-2 rounded"
+          value={formData[key]?.width || ''}
+          onChange={(e) => handleChange(key, e.target.value, 'width')}
+        />
+        <input
+          type="text"
+          placeholder="Height (e.g. 100px)"
+          className="border p-2 rounded"
+          value={formData[key]?.height || ''}
+          onChange={(e) => handleChange(key, e.target.value, 'height')}
+        />
+      </div>
+
+      <select
+        className="border p-2 rounded w-full"
+        value={formData[key]?.align || 'inline'}
+        onChange={(e) => handleChange(key, e.target.value, 'align')}
+      >
+        <option value="inline">Inline</option>
+        <option value="left">Float Left</option>
+        <option value="right">Float Right</option>
+        <option value="center">Center</option>
+      </select>
+    </div>
+  )
+}
+
+
+    if (/content|body|header|title/i.test(key)) {
+      return (
+        <div key={key}>
+          <label className="block mb-1 capitalize">{key.replace(/_/g, ' ')}</label>
+          <RichTextEditor
+            content={formData[key]}
+            onChange={(html: string) => handleChange(key, html)}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div key={key}>
+        <label className="block mb-1 capitalize">{key.replace(/_/g, ' ')}</label>
+        <input
+          type={key === 'date' ? 'date' : 'text'}
+          name={key}
+          value={formData[key] || ''}
+          onChange={(e) => handleChange(key, e.target.value)}
+          className="border p-2 w-full rounded"
+        />
+      </div>
+    )
   }
 
-  const generateLetter = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/letters/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template_id: templateId,
-          data: formData
-        }),
-      })
+  const renderPreview = () => {
+    if (!template?.html_content) return null
+    let content = template.html_content
+
+    content = content.replace(/{{(\w+)}}/g, (_, key) => {
+      const value = formData[key]
       
-      if (!res.ok) throw new Error('Generation failed')
-      
-      const result = await res.json()
-      
-      // Download the generated letter
-      if (result.downloadUrl) {
-        window.open(result.downloadUrl, '_blank')
+      if (isImagePlaceholder(key) && value?.value) {
+        const width = value.width || 'auto'
+        const height = value.height || 'auto'
+        const align = value.align || 'inline'
+
+        let style = `max-height:200px; width:${width}; height:${height};`
+        if (align === 'left') style += ' float:left; margin-right:10px;'
+        else if (align === 'right') style += ' float:right; margin-left:10px;'
+        else if (align === 'center') style += ' display:block; margin:auto;'
+
+        return `<img src="${value.value}" alt="${key}" style="${style}" />`
       }
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+
+      // For text placeholders, value is a string
+      if (/content|body|header|title|ti-tor/i.test(key) && typeof value === 'string') {
+        return value
+      }
+
+      return value || `<span class='text-gray-400'>[${key}]</span>`
+    })
+
+
+
+    return <div dangerouslySetInnerHTML={{ __html: content }} />
   }
 
   if (loading) return <div>Loading template...</div>
-  if (error) return <div>Error: {error}</div>
-  if (!template) return <div>Template not found</div>
+  if (error) return <div className="text-red-600">Error: {error}</div>
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Create New Letter</h2>
         <Link href="/templates" className="text-blue-600 hover:underline">
@@ -105,56 +203,15 @@ export default function NewLetterPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Form Section */}
         <div className="space-y-4">
-          {template.placeholders?.map((placeholder: string) => (
-            <div key={placeholder}>
-              <label className="block mb-1 capitalize">
-                {placeholder.replace(/_/g, ' ')}
-              </label>
-              {placeholder === 'content' ? (
-                <textarea
-                  name={placeholder}
-                  value={formData[placeholder] || ''}
-                  onChange={handleChange}
-                  rows={4}
-                  className="border p-2 w-full rounded"
-                />
-              ) : (
-                <input
-                  type={placeholder === 'date' ? 'date' : 'text'}
-                  name={placeholder}
-                  value={formData[placeholder] || ''}
-                  onChange={handleChange}
-                  className="border p-2 w-full rounded"
-                />
-              )}
-            </div>
-          ))}
+          {template.placeholders?.map((placeholder: string) => renderInput(placeholder))}
         </div>
-
-        {/* Preview Section */}
         <div>
           <h3 className="text-lg font-semibold mb-2">Preview</h3>
-          <div className="bg-white p-8 border rounded-lg shadow-inner">
-            <div dangerouslySetInnerHTML={{
-              __html: template.html_content.replace(
-                /{{(\w+)}}/g, 
-                (match: string, p1: string) => formData[p1] || `<span class="text-gray-400">[${p1}]</span>`
-              )
-            }} />
+          <div className="bg-white p-4 border rounded shadow-inner overflow-auto">
+            {renderPreview()}
           </div>
         </div>
-      </div>
-
-      <div className="mt-6 flex gap-4">
-        <button
-          onClick={generateLetter}
-          disabled={loading}
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Generating...' : 'Generate Letter'}
-        </button>
       </div>
     </div>
   )

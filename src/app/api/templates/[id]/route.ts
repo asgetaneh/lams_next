@@ -8,7 +8,7 @@ export async function GET(
   try {
     const template = await prisma.templates.findUnique({
       where: { template_id: params.id },
-      include: { letter_type: true }
+    //   include: { letter_type: true }
     });
 
     if (!template) {
